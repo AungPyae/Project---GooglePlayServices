@@ -8,6 +8,8 @@ import android.content.Context;
  */
 public class GPSApplication extends Application {
 
+    public static final String TAG = GPSApplication.class.getSimpleName();
+
     private static Context context;
 
     @Override
