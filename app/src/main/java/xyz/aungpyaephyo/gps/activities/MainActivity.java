@@ -1,40 +1,25 @@
 package xyz.aungpyaephyo.gps.activities;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
-import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.DetectedActivity;
 
-import xyz.aungpyaephyo.gps.GPSApplication;
+import java.util.ArrayList;
+
 import xyz.aungpyaephyo.gps.R;
-import xyz.aungpyaephyo.gps.fragments.MainFragment;
+import xyz.aungpyaephyo.gps.fragments.ActivityRecognitionFragment;
+import xyz.aungpyaephyo.gps.fragments.LocationFragment;
 
-public class MainActivity extends AppCompatActivity implements
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
-
-    private static final int ACCESS_LOCATION_PERMISSIONS = 100;
-
-    private GoogleApiClient mGoogleApiClient;
-    private LocationRequest mLocationRequest;
+public class MainActivity extends BaseActivity
+        implements LocationFragment.ControllerLocation {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,23 +37,11 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(LocationServices.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        mGoogleApiClient.connect();
-    }
-
-    @Override
-    protected void onStop() {
-        mGoogleApiClient.disconnect();
-        super.onStop();
+        if (savedInstanceState == null) {
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fl_main_container, new LocationFragment(), LocationFragment.TAG)
+                    .commit();
+        }
     }
 
     @Override
@@ -94,78 +67,34 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        switch (requestCode) {
-            case ACCESS_LOCATION_PERMISSIONS: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    // permission was granted, yay!
-                    makeLocationRequest();
-
-                } else {
-
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
-                }
-                return;
-            }
-
-            // other 'case' lines to check for other
-            // permissions this app might request
-        }
+    public void onTapActivityRecognition() {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fl_main_container, new ActivityRecognitionFragment(), ActivityRecognitionFragment.TAG)
+                .addToBackStack(null)
+                .commit();
     }
 
     @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        Log.d(GPSApplication.TAG, "GPS onConnected");
-
-        mLocationRequest = LocationRequest.create();
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        mLocationRequest.setInterval(5000); //ms
-
-        makeLocationRequest();
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-        Log.d(GPSApplication.TAG, "GPS onConnectionSuspended");
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        Log.d(GPSApplication.TAG, "GPS onConnectionFailed");
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        Log.d(GPSApplication.TAG, "GPS onLocationChanged");
-
-        MainFragment mainFragment = (MainFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_main);
-        if (mainFragment != null) {
-            mainFragment.setLocation(location.getLatitude() + ", " + location.getLongitude());
+    protected void onLocationRetrieved(Location location) {
+        super.onLocationRetrieved(location);
+        LocationFragment locationFragment = (LocationFragment) getSupportFragmentManager().findFragmentByTag(LocationFragment.TAG);
+        if (locationFragment != null) {
+            locationFragment.setLocation(location);
         } else {
-            Toast.makeText(getApplicationContext(), "Can't find main fragment by id", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), "Can't find location fragment by tag", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void makeLocationRequest() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
+    @Override
+    protected void onActivitiesDetected(ArrayList<DetectedActivity> detectedActivities) {
+        super.onActivitiesDetected(detectedActivities);
+        ActivityRecognitionFragment activityRecognitionFragment =
+                (ActivityRecognitionFragment) getSupportFragmentManager().findFragmentByTag(ActivityRecognitionFragment.TAG);
 
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
-                    ACCESS_LOCATION_PERMISSIONS);
-
-            return;
+        if (activityRecognitionFragment != null) {
+            activityRecognitionFragment.setDetectedActivities(detectedActivities);
+        } else {
+            Toast.makeText(getApplicationContext(), "Can't find activity recognition fragment by tag", Toast.LENGTH_SHORT).show();
         }
-        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
     }
 }
